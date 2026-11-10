@@ -1,0 +1,33 @@
+hardware:
+  max_vram_gb: 8.0
+  precision: "fp16"
+  device: "cuda"
+  offload_to_cpu: true
+  clear_cache_between_stages: true
+
+stage1_odometry:
+  depth_model: "lpiccinelli/unidepth-v2-vitl14"
+  batch_size: 4
+  depth_median_kernel_size: 5
+
+stage2_hand:
+  detector_conf: 0.6
+  hamer_batch_size: 8
+  contact_distance_threshold_m: 0.035
+
+stage3_retargeting:
+  gripper_min_opening_m: 0.015
+  gripper_max_opening_m: 0.095
+  workspace_offset_xyz: [0.45, 0.0, 0.25]
+
+stage4_kinematics:
+  robot_embodiment: "franka_emika_panda"
+  end_effector_site: "attachment_site"
+  spline_smoothing_factor: 0.002
+  ik_max_iterations: 50
+  ik_pos_tolerance_m: 0.015
+  min_valid_frame_ratio: 0.90
+
+stage5_exporter:
+  dataset_repo_id: "ego2act/pov-manipulation-v1"
+  fps: 30
