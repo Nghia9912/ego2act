@@ -13,6 +13,7 @@ dependencies = [
     "scipy>=1.10.0",
     "safetensors>=0.4.0",
     "pyyaml>=6.0",
+    "rerun-sdk>=0.22.0",
 ]
 
 [project.optional-dependencies]
@@ -21,6 +22,10 @@ dev = [
     "ruff>=0.3.0",
 ]
 
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
@@ -28,3 +33,6 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]

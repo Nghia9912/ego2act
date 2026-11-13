@@ -1,6 +1,6 @@
 """
-Defines the core data entities for all 5 stages of Ego2Act.
-Includes tensor shape validation and direct save/load via .safetensors.
+Core data entities for all 5 pipeline stages of Ego2Act.
+Includes deterministic tensor shape validation and zero-copy .safetensors I/O.
 """
 
 from __future__ import annotations
@@ -14,17 +14,19 @@ from safetensors.numpy import load_file, save_file
 
 @dataclass
 class Stage1OdometryOutput:
-    """Output of Stage 1: absolute depth (Metric Depth) and camera motion (Visual Odometry)."""
+    """Output of Stage 1: metric depth maps and camera-to-world visual odometry."""
 
     intrinsics: np.ndarray      # (3, 3) float32 - camera intrinsic matrix K
-    depth_maps: np.ndarray      # (T, H, W) float16/float32 - depth maps in meters
-    cam_to_world: np.ndarray    # (T, 4, 4) float64 - T_W^{C_t} transform in SE(3)
+    depth_maps: np.ndarray      # (T, H, W) float32 - metric depth maps in meters
+    cam_to_world: np.ndarray    # (T, 4, 4) float64 - camera-to-world poses in SE(3)
 
     def __post_init__(self) -> None:
         if self.intrinsics.shape != (3, 3):
             raise ValueError(f"intrinsics must have shape (3, 3), got {self.intrinsics.shape}")
         if self.depth_maps.ndim != 3:
-            raise ValueError(f"depth_maps must have 3 dimensions (T, H, W), got {self.depth_maps.shape}")
+            raise ValueError(
+                f"depth_maps must have 3 dimensions (T, H, W), got {self.depth_maps.shape}"
+            )
         num_frames = self.depth_maps.shape[0]
         if self.cam_to_world.shape != (num_frames, 4, 4):
             raise ValueError(
@@ -56,11 +58,11 @@ class Stage1OdometryOutput:
 
 @dataclass
 class Stage2HandOutput:
-    """Output of Stage 2: 21 3D MANO hand joints and contact state."""
+    """Output of Stage 2: 21 3D MANO hand joints and hand-object contact states."""
 
-    joints_3d_cam: np.ndarray   # (T, 21, 3) float32 - 21 MANO joints in camera coordinates
+    joints_3d_cam: np.ndarray   # (T, 21, 3) float32 - 21 MANO joints in camera frame
     wrist_uv: np.ndarray        # (T, 2) float32 - wrist pixel coordinates (u_w, v_w)
-    contact_state: np.ndarray   # (T,) float32 - object contact probability/state in [0, 1]
+    contact_state: np.ndarray   # (T,) float32 - contact probability in [0, 1]
 
     def __post_init__(self) -> None:
         if self.joints_3d_cam.ndim != 3 or self.joints_3d_cam.shape[1:] != (21, 3):
@@ -69,7 +71,9 @@ class Stage2HandOutput:
             )
         num_frames = self.joints_3d_cam.shape[0]
         if self.wrist_uv.shape != (num_frames, 2):
-            raise ValueError(f"wrist_uv must have shape ({num_frames}, 2), got {self.wrist_uv.shape}")
+            raise ValueError(
+                f"wrist_uv must have shape ({num_frames}, 2), got {self.wrist_uv.shape}"
+            )
         if self.contact_state.shape != (num_frames,):
             raise ValueError(
                 f"contact_state must have shape ({num_frames},), got {self.contact_state.shape}"
@@ -100,11 +104,11 @@ class Stage2HandOutput:
 
 @dataclass
 class Stage3RetargetOutput:
-    """Output of Stage 3: end-effector trajectory T_{EE} in the world frame and gripper opening g_t."""
+    """Output of Stage 3: world-frame end-effector trajectory and gripper opening."""
 
-    ee_poses_world: np.ndarray  # (T, 4, 4) float64 - sequence of T_{EE}(t) transforms in SE(3)
-    gripper_width: np.ndarray   # (T,) float32 - normalized gripper opening g_t in [0, 1]
-    joints_3d_world: np.ndarray # (T, 21, 3) float32 - 21 hand joints after head motion removal and metric-depth alignment
+    ee_poses_world: np.ndarray   # (T, 4, 4) float64 - T_{EE}(t) transforms in SE(3)
+    gripper_width: np.ndarray    # (T,) float32 - normalized gripper opening in [0, 1]
+    joints_3d_world: np.ndarray  # (T, 21, 3) float32 - stabilized world-frame hand joints
 
     def __post_init__(self) -> None:
         num_frames = self.ee_poses_world.shape[0]
@@ -118,7 +122,8 @@ class Stage3RetargetOutput:
             )
         if self.joints_3d_world.shape != (num_frames, 21, 3):
             raise ValueError(
-                f"joints_3d_world must have shape ({num_frames}, 21, 3), got {self.joints_3d_world.shape}"
+                f"joints_3d_world must have shape ({num_frames}, 21, 3), "
+                f"got {self.joints_3d_world.shape}"
             )
 
     def save(self, path: str | Path) -> Path:
@@ -146,16 +151,16 @@ class Stage3RetargetOutput:
 
 @dataclass
 class Stage4VerifiedTrajectory:
-    """Output of Stage 4: smoothed trajectory and inverse-kinematics verification in MuJoCo."""
+    """Output of Stage 4: B-Spline smoothed and MuJoCo IK-verified robot trajectory."""
 
-    smoothed_ee_poses: np.ndarray  # (T, 4, 4) float64 - T_{EE}(t) after B-Spline & SLERP filtering
-    joint_positions: np.ndarray    # (T, D) float32 - robot joint angles q_t (e.g., D=7 for Franka Panda)
-    gripper_width: np.ndarray      # (T,) float32 - normalized gripper command g_t in [0, 1]
-    ik_valid_mask: np.ndarray      # (T,) bool/uint8 - flag marking IK-converged and collision-free frames
+    smoothed_ee_poses: np.ndarray  # (T, 4, 4) float64 - smoothed T_{EE}(t) poses
+    joint_positions: np.ndarray    # (T, D) float32 - solved robot joint angles q_t
+    gripper_width: np.ndarray      # (T,) float32 - normalized gripper command in [0, 1]
+    ik_valid_mask: np.ndarray      # (T,) bool/uint8 - valid IK & collision-free flags
 
     @property
     def feasibility_rate(self) -> float:
-        """Percentage of timesteps satisfying the kinematic feasibility standard (acceptance >= 0.90)."""
+        """Fraction of timesteps satisfying kinematic feasibility (target >= 0.90)."""
         return float(np.mean(self.ik_valid_mask.astype(np.float32)))
 
     def save(self, path: str | Path) -> Path:

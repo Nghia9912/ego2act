@@ -1,6 +1,5 @@
 """
-Day 1 foundation test: verifies entity integrity (.safetensors I/O)
-and the memory lifecycle management of StagedPipelineRunner.
+Unit tests for core data entities (.safetensors serialization) and StagedPipelineRunner.
 """
 
 from pathlib import Path
@@ -12,14 +11,15 @@ import pytest
 from src.core.entities import (
     Stage1OdometryOutput,
     Stage2HandOutput,
+    Stage3RetargetOutput,
     Stage4VerifiedTrajectory,
 )
 from src.core.interfaces import BasePipelineStage
 from src.orchestrator.staged_runner import StagedPipelineRunner
 
 
-def test_stage1_and_stage2_safetensors_roundtrip(tmp_path: Path) -> None:
-    """Verify saving and reloading Stage 1 & Stage 2 data in the .safetensors format."""
+def test_stage1_to_stage3_safetensors_roundtrip(tmp_path: Path) -> None:
+    """Verifies lossless .safetensors serialization for Stage 1, 2, and 3 entities."""
     num_frames, height, width = 10, 64, 64
 
     s1_out = Stage1OdometryOutput(
@@ -46,22 +46,35 @@ def test_stage1_and_stage2_safetensors_roundtrip(tmp_path: Path) -> None:
     s2_loaded = Stage2HandOutput.load(s2_file)
     np.testing.assert_allclose(s2_loaded.contact_state, s2_out.contact_state)
 
+    s3_out = Stage3RetargetOutput(
+        ee_poses_world=np.tile(np.eye(4, dtype=np.float64), (num_frames, 1, 1)),
+        gripper_width=np.linspace(0.1, 0.9, num_frames, dtype=np.float32),
+        joints_3d_world=np.zeros((num_frames, 21, 3), dtype=np.float32),
+    )
+    s3_file = tmp_path / "episode_000_s3.safetensors"
+    s3_out.save(s3_file)
+
+    s3_loaded = Stage3RetargetOutput.load(s3_file)
+    np.testing.assert_allclose(s3_loaded.ee_poses_world, s3_out.ee_poses_world)
+    np.testing.assert_allclose(s3_loaded.gripper_width, s3_out.gripper_width)
+
 
 def test_entity_shape_validation_raises_error() -> None:
-    """Ensure the entity raises a ValueError immediately if the tensor shape is invalid."""
+    """Verifies that malformed tensor dimensions immediately raise ValueError."""
     with pytest.raises(ValueError, match="joints_3d_cam must have shape"):
         Stage2HandOutput(
-            joints_3d_cam=np.zeros((10, 20, 3), dtype=np.float32),  # Wrong: 20 joints instead of 21 MANO joints
+            # Invalid: 20 joints instead of 21 MANO joints
+            joints_3d_cam=np.zeros((10, 20, 3), dtype=np.float32),
             wrist_uv=np.zeros((10, 2), dtype=np.float32),
             contact_state=np.zeros((10,), dtype=np.float32),
         )
 
 
 def test_stage4_feasibility_rate_calculation(tmp_path: Path) -> None:
-    """Verify the kinematic feasibility rate calculation (Kinematic Feasibility >= 90%)."""
+    """Verifies kinematic feasibility rate computation and boolean mask roundtrip."""
     num_frames = 20
     mask = np.ones((num_frames,), dtype=bool)
-    mask[-1] = False  # 19/20 valid frames = 95% (>= 90% DoD)
+    mask[-1] = False
 
     s4_out = Stage4VerifiedTrajectory(
         smoothed_ee_poses=np.tile(np.eye(4, dtype=np.float64), (num_frames, 1, 1)),
@@ -79,7 +92,7 @@ def test_stage4_feasibility_rate_calculation(tmp_path: Path) -> None:
 
 
 class DummyStage(BasePipelineStage[int, int]):
-    """Mock stage used to test the Load -> Process -> Unload lifecycle of StagedPipelineRunner."""
+    """Mock stage to verify Load -> Process -> Unload execution order."""
 
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config)
@@ -104,7 +117,7 @@ class DummyStage(BasePipelineStage[int, int]):
 
 
 def test_staged_pipeline_runner_lifecycle() -> None:
-    """Verify that StagedPipelineRunner executes in the correct order and releases models after running."""
+    """Verifies that StagedPipelineRunner executes stages and unloads models deterministically."""
     runner = StagedPipelineRunner("configs/pipeline_vram_8gb.yaml")
     assert runner.config["hardware"]["max_vram_gb"] == 8.0
 

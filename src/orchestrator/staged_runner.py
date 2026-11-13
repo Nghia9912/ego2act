@@ -1,7 +1,7 @@
 """
-Sequential staged runner coordinator.
-Ensures each stage loads models, processes data, caches .safetensors, and releases VRAM cleanly
-before moving to the next stage to run smoothly on an 8GB VRAM GPU.
+Sequential Staged Pipeline Runner.
+Executes each stage in isolation and deterministically reclaims Python and CUDA memory
+between stages to remain within an 8GB VRAM budget.
 """
 
 from __future__ import annotations
@@ -21,8 +21,8 @@ logger = logging.getLogger("ego2act.orchestrator")
 
 def flush_memory() -> dict[str, float]:
     """
-    Forces Python's garbage collector to reclaim memory and clears CUDA cache (if PyTorch is installed).
-    Returns allocated VRAM usage information (GB) for monitoring against the <8GB VRAM target.
+    Forces Python garbage collection and clears PyTorch CUDA cache if available.
+    Returns allocated and reserved VRAM metrics in gigabytes (GB).
     """
     gc.collect()
     vram_stats = {"allocated_gb": 0.0, "reserved_gb": 0.0}
@@ -42,7 +42,7 @@ def flush_memory() -> dict[str, float]:
 
 
 class StagedPipelineRunner:
-    """Manages the sequential stage lifecycle and memory control."""
+    """Manages sequential execution and memory reclamation across pipeline stages."""
 
     def __init__(self, config_path: str | Path) -> None:
         self.config_path = Path(config_path)
@@ -50,8 +50,8 @@ class StagedPipelineRunner:
             self.config: dict[str, Any] = yaml.safe_load(f)
 
     def run_stage(self, stage: BasePipelineStage[Any, Any], inputs: Any) -> Any:
-        """Executes a single stage with the flow: Load -> Process -> Unload -> Flush VRAM."""
-        logger.info("=== Start [%s] ===", stage.stage_name)
+        """Executes a single stage with Load -> Process -> Unload -> Flush VRAM lifecycle."""
+        logger.info("=== Starting [%s] ===", stage.stage_name)
         t0 = time.perf_counter()
 
         stage.load_models()
@@ -63,7 +63,7 @@ class StagedPipelineRunner:
 
         elapsed = time.perf_counter() - t0
         logger.info(
-            "=== Complete [%s] in %.2fs | VRAM remaining: %.3f GB ===",
+            "=== Completed [%s] in %.2fs | Remaining VRAM: %.3f GB ===",
             stage.stage_name,
             elapsed,
             vram_after["allocated_gb"],
