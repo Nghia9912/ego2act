@@ -1,31 +1,38 @@
 [project]
 name = "ego2act"
 version = "0.1.0"
-description = "Add your description here"
+description = "Egocentric video-to-action extraction engine compiling monocular POV videos into LeRobotDataset trajectories."
 readme = "README.md"
-authors = [
-    { name = "Nghia9912", email = "nghiaroyal3507@gmail.com" }
-]
+license = { file = "LICENSE" }
 requires-python = ">=3.11"
-dependencies = [
-    "numpy>=2.4.6",
-    "pydantic>=2.14.3",
-    "pyyaml>=6.0.3",
-    "rerun-sdk>=0.43.2",
-    "safetensors>=0.8.0",
-    "scipy>=1.17.1",
-]
-
-[project.scripts]
-ego2act = "ego2act:main"
-
-[build-system]
-requires = ["uv_build>=0.13.9,<0.14.0"]
-build-backend = "uv_build"
+dependencies = []
 
 [dependency-groups]
 dev = [
-    "mypy>=2.4.1",
-    "pytest>=9.2.0",
-    "ruff>=0.17.5",
+    "mypy>=1.11.0",
+    "pytest>=8.3.0",
+    "ruff>=0.6.0",
 ]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra -q"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
