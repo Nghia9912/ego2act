@@ -1,0 +1,31 @@
+[project]
+name = "ego2act"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Nghia9912", email = "nghiaroyal3507@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=2.4.6",
+    "pydantic>=2.14.3",
+    "pyyaml>=6.0.3",
+    "rerun-sdk>=0.43.2",
+    "safetensors>=0.8.0",
+    "scipy>=1.17.1",
+]
+
+[project.scripts]
+ego2act = "ego2act:main"
+
+[build-system]
+requires = ["uv_build>=0.13.9,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.4.1",
+    "pytest>=9.2.0",
+    "ruff>=0.17.5",
+]

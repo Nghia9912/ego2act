@@ -1,0 +1,40 @@
+# Python & uv
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Large media, model weights & pipeline caches
+data/
+checkpoints/
+weights/
+outputs/
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.parquet
+*.h5
+*.hdf5
+*.zarr/
+*.rrd
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
