@@ -5,13 +5,17 @@ description = "Egocentric video-to-action extraction engine compiling monocular 
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "pydantic>=2.14.4",
+    "pyyaml>=6.0.4",
+]
 
 [dependency-groups]
 dev = [
     "mypy>=1.11.0",
     "pytest>=8.3.0",
     "ruff>=0.6.0",
+    "types-pyyaml>=6.0.12.20261113",
 ]
 
 [tool.ruff]
