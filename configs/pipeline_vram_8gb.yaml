@@ -1,0 +1,46 @@
+# Hardware-constrained sequential execution profile for single 8 GB VRAM GPUs.
+
+hardware:
+  device: "cuda"
+  precision: "fp16"
+  max_vram_gb: 8.0
+  sequential_offload: true
+  clear_cache_between_stages: true
+
+io:
+  cache_dir: "data/cache"
+  output_dir: "data/output"
+  cache_format: "safetensors"
+  target_fps: 30
+
+stage1_odometry:
+  depth_backend: "unidepth"
+  odometry_backend: "droid_slam"
+  batch_size: 4
+
+stage2_hand:
+  hand_backend: "hamer"
+  batch_size: 4
+  contact_threshold_m: 0.035
+  max_occlusion_gap_frames: 5
+
+stage3_retargeting:
+  depth_patch_radius_px: 3
+  gripper_min_aperture_m: 0.015
+  gripper_max_aperture_m: 0.085
+  orientation_representation: "quaternion"
+
+stage4_kinematics:
+  robot_embodiment: "franka_emika_panda"
+  mjcf_path: "configs/robot_embodiments/franka_emika_panda/scene.xml"
+  smoother: "bspline"
+  bspline_smoothing_factor: 0.002
+  slerp_cutoff_hz: 6.0
+  max_position_error_m: 0.015
+  min_ik_convergence_ratio: 0.90
+  reject_self_collision: true
+
+stage5_export:
+  dataset_format: "lerobot"
+  video_codec: "libx264"
+  include_joint_space_metadata: true
