@@ -43,3 +43,57 @@ class FrameState:
             raise ValueError(
                 f"Expected depth_metric_m shape (H, W), got {self.depth_metric_m.shape}"
             )
+@dataclass(slots=True)
+class HandObservation:
+    """3D MANO hand skeleton and contact state extracted by Stage 2."""
+
+    frame_index: int
+    joints_3d_cam: NDArray[np.float32]
+    wrist_uv: tuple[float, float]
+    is_right: bool = True
+    in_contact: bool = False
+    confidence: float = 1.0
+
+    def __post_init__(self) -> None:
+        if self.frame_index < 0:
+            raise ValueError(f"frame_index must be non-negative, got {self.frame_index}")
+        if self.joints_3d_cam.shape != (21, 3):
+            raise ValueError(
+                f"Expected joints_3d_cam shape (21, 3), got {self.joints_3d_cam.shape}"
+            )
+        if not 0.0 <= self.confidence <= 1.0:
+            raise ValueError(f"confidence must be in [0, 1], got {self.confidence}")
+
+
+@dataclass(slots=True)
+class SE3Trajectory:
+    """World-stabilized parallel-jaw end-effector trajectory in SE(3)."""
+
+    timestamps_s: NDArray[np.float64]
+    positions_m: NDArray[np.float32]
+    orientations_xyzw: NDArray[np.float32]
+    gripper_openness: NDArray[np.float32]
+
+    def __post_init__(self) -> None:
+        num_steps = len(self.timestamps_s)
+        if self.timestamps_s.ndim != 1 or num_steps == 0:
+            raise ValueError(
+                f"timestamps_s must be non-empty 1D array, got {self.timestamps_s.shape}"
+            )
+        if self.positions_m.shape != (num_steps, 3):
+            raise ValueError(
+                f"Expected positions_m shape ({num_steps}, 3), got {self.positions_m.shape}"
+            )
+        if self.orientations_xyzw.shape != (num_steps, 4):
+            raise ValueError(
+                f"Expected orientations_xyzw shape ({num_steps}, 4), "
+                f"got {self.orientations_xyzw.shape}"
+            )
+        if self.gripper_openness.shape != (num_steps,):
+            raise ValueError(
+                f"Expected gripper_openness shape ({num_steps},), "
+                f"got {self.gripper_openness.shape}"
+            )
+
+    def __len__(self) -> int:
+        return int(len(self.timestamps_s))
