@@ -97,3 +97,60 @@ class SE3Trajectory:
 
     def __len__(self) -> int:
         return int(len(self.timestamps_s))
+@dataclass(slots=True)
+class RobotAction:
+    """Standardized robot proprioceptive states, delta SE(3) actions, and optional IK joints."""
+
+    proprio_state: NDArray[np.float32]
+    actions_7d: NDArray[np.float32]
+    joint_positions_rad: NDArray[np.float32] | None = None
+
+    def __post_init__(self) -> None:
+        if self.proprio_state.ndim != 2 or self.proprio_state.shape[1] < 7:
+            raise ValueError(
+                f"Expected proprio_state shape (T, D>=7), got {self.proprio_state.shape}"
+            )
+        num_steps = self.proprio_state.shape[0]
+        if self.actions_7d.shape != (num_steps, 7):
+            raise ValueError(
+                f"Expected actions_7d shape ({num_steps}, 7), got {self.actions_7d.shape}"
+            )
+        if self.joint_positions_rad is not None and (
+            self.joint_positions_rad.ndim != 2 or self.joint_positions_rad.shape[0] != num_steps
+        ):
+            raise ValueError(
+                f"Expected joint_positions_rad shape ({num_steps}, N_joints), "
+                f"got {self.joint_positions_rad.shape}"
+            )
+
+    def __len__(self) -> int:
+        return int(self.proprio_state.shape[0])
+
+
+@dataclass(slots=True)
+class EpisodeMetadata:
+    """Quality metrics and validity flags recorded after Stage 4 MuJoCo verification."""
+
+    episode_id: str
+    source_video: str
+    fps: float
+    num_frames: int
+    robot_embodiment: str
+    ik_convergence_ratio: float
+    mean_position_error_m: float
+    has_self_collision: bool
+    is_valid: bool
+
+    def __post_init__(self) -> None:
+        if self.fps <= 0.0:
+            raise ValueError(f"fps must be positive, got {self.fps}")
+        if self.num_frames <= 0:
+            raise ValueError(f"num_frames must be positive, got {self.num_frames}")
+        if not 0.0 <= self.ik_convergence_ratio <= 1.0:
+            raise ValueError(
+                f"ik_convergence_ratio must be in [0, 1], got {self.ik_convergence_ratio}"
+            )
+        if self.mean_position_error_m < 0.0:
+            raise ValueError(
+                f"mean_position_error_m must be non-negative, got {self.mean_position_error_m}"
+            )
