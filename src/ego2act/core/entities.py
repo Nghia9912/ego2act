@@ -43,6 +43,8 @@ class FrameState:
             raise ValueError(
                 f"Expected depth_metric_m shape (H, W), got {self.depth_metric_m.shape}"
             )
+
+
 @dataclass(slots=True)
 class HandObservation:
     """3D MANO hand skeleton and contact state extracted by Stage 2."""
@@ -91,12 +93,13 @@ class SE3Trajectory:
             )
         if self.gripper_openness.shape != (num_steps,):
             raise ValueError(
-                f"Expected gripper_openness shape ({num_steps},), "
-                f"got {self.gripper_openness.shape}"
+                f"Expected gripper_openness shape ({num_steps},), got {self.gripper_openness.shape}"
             )
 
     def __len__(self) -> int:
         return int(len(self.timestamps_s))
+
+
 @dataclass(slots=True)
 class RobotAction:
     """Standardized robot proprioceptive states, delta SE(3) actions, and optional IK joints."""

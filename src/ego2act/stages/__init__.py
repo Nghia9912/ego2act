@@ -1,2 +1,1 @@
 """Sequential pipeline stage implementations."""
-
